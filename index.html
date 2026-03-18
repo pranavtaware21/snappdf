@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SnapPDF</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0c;
+    --card: #12121a;
+    --card2: #1a1a26;
+    --border: #222233;
+    --text: #f0f0f5;
+    --text2: #9090aa;
+    --text3: #606078;
+    --purple: #7c3aed;
+    --purple2: #8b5cf6;
+    --purple-glow: rgba(124,58,237,0.12);
+    --purple-glow2: rgba(124,58,237,0.25);
+    --green: #10b981;
+    --green-glow: rgba(16,185,129,0.1);
+    --red: #ef4444;
+    --orange: #f59e0b;
+    --r: 14px;
+    --rs: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124,58,237,0.08), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 100%, rgba(16,185,129,0.04), transparent);
+  }
+
+  .app { max-width: 960px; margin: 0 auto; padding: 2.5rem 1.5rem 3rem; }
+
+  /* ---- Header ---- */
+  .header { text-align: center; margin-bottom: 2rem; }
+  .logo { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .logo-box {
+    width: 42px; height: 42px; border-radius: 12px;
+    background: linear-gradient(135deg, #7c3aed, #a78bfa);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+  }
+  .logo-box svg { width: 22px; height: 22px; }
+  .logo h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.04em; background: linear-gradient(135deg, #e0e0ff, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header .tagline { color: var(--text3); font-size: 0.82rem; font-weight: 400; }
+  .header .tagline span { color: var(--text2); }
+
+  /* ---- Tabs ---- */
+  .tabs {
+    display: flex; gap: 4px; margin-bottom: 2rem;
+    background: var(--card); border: 1px solid var(--border);
+    padding: 5px; border-radius: var(--r);
+  }
+  .tab {
+    flex: 1; padding: 11px 16px; border: none; background: transparent;
+    color: var(--text3); font-size: 0.82rem; font-weight: 600;
+    border-radius: var(--rs); cursor: pointer; font-family: inherit;
+    transition: all 0.25s ease; position: relative;
+  }
+  .tab:hover { color: var(--text2); }
+  .tab.active {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.35);
+  }
+  .tab .icon { display: inline-block; margin-right: 6px; vertical-align: -2px; }
+  .panel { display: none; animation: fadeIn 0.3s ease; }
+  .panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ---- Settings ---- */
+  .settings {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.25rem;
+    padding: 10px 12px; background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--r);
+  }
+  .st {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 10px; background: var(--card2); border-radius: 8px;
+    border: 1px solid transparent; transition: border-color 0.15s;
+  }
+  .st:hover { border-color: var(--border); }
+  .st-label { font-size: 0.62rem; color: var(--text3); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; }
+  .st select {
+    background: transparent; color: var(--text); border: none;
+    font-size: 0.78rem; font-family: inherit; font-weight: 500;
+    cursor: pointer; outline: none;
+  }
+  .st select option { background: var(--card); }
+  .st input[type="range"] { width: 70px; accent-color: var(--purple); cursor: pointer; }
+  .st .val { font-size: 0.78rem; color: var(--purple2); font-weight: 700; min-width: 28px; text-align: right; }
+
+  /* ---- Upload Areas ---- */
+  .upload-zone {
+    display: block; cursor: pointer;
+    border: 2px dashed var(--border); border-radius: var(--r);
+    padding: 44px 24px; text-align: center;
+    background: var(--card);
+    position: relative; overflow: hidden;
+    transition: all 0.3s ease; margin-bottom: 1.5rem;
+  }
+  .upload-zone::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    background: radial-gradient(circle at 50% 50%, var(--purple-glow), transparent 70%);
+    opacity: 0; transition: opacity 0.4s;
+  }
+  .upload-zone:hover::before, .upload-zone.drag::before { opacity: 1; }
+  .upload-zone:hover { border-color: var(--purple); }
+  .upload-zone:active { transform: scale(0.997); }
+  .upload-zone input[type="file"] { display: none; }
+  .upload-zone .uz-icon { margin-bottom: 12px; }
+  .upload-zone .uz-icon svg { width: 48px; height: 48px; }
+  .upload-zone h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; position: relative; }
+  .upload-zone h3 em { font-style: normal; color: var(--purple2); }
+  .upload-zone .uz-sub { color: var(--text3); font-size: 0.72rem; position: relative; }
+  .upload-zone .uz-sub kbd { display: inline-block; background: var(--card2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 0.62rem; font-family: 'SF Mono', monospace; color: var(--text2); }
+  .upload-zone .uz-btn {
+    display: inline-block; margin-top: 14px; position: relative;
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff; padding: 10px 26px; border-radius: 8px;
+    font-weight: 600; font-size: 0.82rem; letter-spacing: -0.01em;
+    box-shadow: 0 4px 16px rgba(124,58,237,0.25);
+    pointer-events: none; transition: box-shadow 0.2s;
+  }
+  .upload-zone:hover .uz-btn { box-shadow: 0 6px 24px rgba(124,58,237,0.4); }
+
+  /* ---- Image Grid ---- */
+  .section-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .section-head h2 { font-size: 0.78rem; font-weight: 600; color: var(--text2); }
+  .section-head .count { background: var(--purple-glow); color: var(--purple2); font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; margin-left: 6px; }
+  .section-head .hint { font-size: 0.62rem; color: var(--text3); }
+
+  .image-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px; margin-bottom: 1.5rem;
+  }
+  .img-card {
+    position: relative; background: var(--card); border-radius: var(--rs);
+    overflow: hidden; border: 1px solid var(--border);
+    transition: all 0.25s ease;
+  }
+  .img-card:hover { border-color: #333355; transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,0.4); }
+  .img-card img { width: 100%; height: 130px; object-fit: cover; display: block; background: #0a0a0f; }
+  .img-card .badge {
+    position: absolute; top: 6px; left: 6px;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+    color: #fff; font-size: 0.58rem; font-weight: 800;
+    width: 20px; height: 20px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .img-card .x-btn {
+    position: absolute; top: 6px; right: 6px;
+    background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+    color: var(--red); border: none; border-radius: 6px;
+    width: 24px; height: 24px; cursor: pointer; font-size: 15px;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: all 0.15s;
+  }
+  .img-card:hover .x-btn { opacity: 1; }
+  .img-card .x-btn:hover { background: var(--red); color: #fff; }
+  .img-card .card-meta {
+    padding: 6px 8px; display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--border);
+  }
+  .img-card .card-meta .nm { font-size: 0.6rem; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80px; }
+  .img-card .card-meta .sz { font-size: 0.55rem; color: var(--text3); }
+
+  @media (hover: none) { .img-card .x-btn { opacity: 1; } }
+
+  /* ---- Actions ---- */
+  .action-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 20px; text-align: center; margin-bottom: 1.5rem;
+  }
+  .action-box .info { font-size: 0.8rem; color: var(--text3); margin-bottom: 14px; }
+  .action-box .info b { color: var(--text); }
+
+  .btn-gen {
+    background: linear-gradient(135deg, #7c3aed, #6d28d9);
+    color: #fff; border: none; padding: 13px 36px; border-radius: var(--rs);
+    font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+    transition: all 0.2s; letter-spacing: -0.01em;
+  }
+  .btn-gen:hover { box-shadow: 0 8px 32px rgba(124,58,237,0.45); transform: translateY(-1px); }
+  .btn-gen:active { transform: translateY(0); }
+  .btn-gen:disabled { background: #222233; color: #555; box-shadow: none; cursor: not-allowed; }
+
+  .btn-clear {
+    background: transparent; color: var(--red); border: 1px solid rgba(239,68,68,0.15);
+    padding: 9px 20px; border-radius: var(--rs); font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-left: 10px; transition: all 0.2s;
+  }
+  .btn-clear:hover { background: rgba(239,68,68,0.08); }
+
+  .prog-text { margin-top: 12px; font-size: 0.75rem; color: var(--purple2); font-weight: 500; }
+
+  /* ---- Compress Results ---- */
+  .result-box {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--r);
+    padding: 28px; text-align: center; margin-top: 1.5rem;
+  }
+  .result-box h3 { font-size: 0.9rem; font-weight: 600; margin-bottom: 4px; word-break: break-all; }
+  .result-box .pages { font-size: 0.72rem; color: var(--text3); margin-bottom: 16px; }
+
+  .size-row { display: flex; justify-content: center; gap: 14px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .size-card { padding: 12px 20px; border-radius: var(--rs); text-align: center; min-width: 100px; }
+  .size-card .lbl { font-size: 0.58rem; color: var(--text3); text-transform: uppercase; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 4px; }
+  .size-card .val { font-size: 1.2rem; font-weight: 800; }
+  .size-card.orig { background: var(--card2); }
+  .size-card.orig .val { color: var(--text2); }
+  .size-card.comp { background: var(--green-glow); border: 1px solid rgba(16,185,129,0.2); }
+  .size-card.comp .val { color: var(--green); }
+  .arrow-sep { color: var(--text3); font-size: 1.2rem; }
+
+  .saving-badge { display: inline-block; font-size: 0.82rem; font-weight: 700; padding: 4px 12px; border-radius: 20px; margin-bottom: 16px; }
+
+  .btn-dl {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: #fff; border: none; padding: 12px 30px; border-radius: var(--rs);
+    font-size: 0.88rem; font-weight: 700; cursor: pointer; font-family: inherit;
+    box-shadow: 0 4px 16px rgba(16,185,129,0.25);
+    transition: all 0.2s;
+  }
+  .btn-dl:hover { box-shadow: 0 8px 24px rgba(16,185,129,0.4); transform: translateY(-1px); }
+
+  .btn-reset {
+    background: transparent; color: var(--text2); border: 1px solid var(--border);
+    padding: 9px 20px; border-radius: var(--rs); font-size: 0.78rem; font-weight: 600;
+    cursor: pointer; font-family: inherit; margin-left: 10px; transition: all 0.2s;
+  }
+  .btn-reset:hover { border-color: #444; color: var(--text); }
+
+  .hidden { display: none !important; }
+
+  /* ---- Mobile ---- */
+  @media (max-width: 640px) {
+    .app { padding: 1.5rem 1rem 2rem; }
+    .logo h1 { font-size: 1.3rem; }
+    .settings { flex-direction: column; }
+    .st { justify-content: space-between; width: 100%; }
+    .image-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .img-card img { height: 100px; }
+    .upload-zone { padding: 30px 16px; }
+    .btn-gen { padding: 12px 24px; font-size: 0.85rem; }
+    .size-row { gap: 8px; }
+  }
+  @media (max-width: 380px) {
+    .tabs { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo">
+      <div class="logo-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+      </div>
+      <h1>SnapPDF</h1>
+    </div>
+    <p class="tagline">Images to PDF <span>&middot;</span> Compress PDF <span>&middot;</span> 100% in your browser</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" id="tabImg">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></span>
+      Images to PDF
+    </button>
+    <button class="tab" id="tabComp">
+      <span class="icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M12 18v-6"/><path d="M9 15l3 3 3-3"/></svg></span>
+      Compress PDF
+    </button>
+  </div>
+
+  <!-- ===== TAB 1: IMAGES TO PDF ===== -->
+  <div class="panel active" id="panelImg">
+    <div class="settings">
+      <div class="st"><span class="st-label">Page</span><select id="pageSize"><option value="a4">A4</option><option value="letter">Letter</option><option value="fit">Fit to Image</option></select></div>
+      <div class="st"><span class="st-label">Orient</span><select id="orient"><option value="portrait">Portrait</option><option value="landscape">Landscape</option><option value="auto">Auto</option></select></div>
+      <div class="st"><span class="st-label">Quality</span><input type="range" id="quality" min="10" max="100" value="75"><span class="val" id="qval">75%</span></div>
+      <div class="st"><span class="st-label">Max W</span><select id="maxW"><option value="0">Original</option><option value="800">800px</option><option value="1200" selected>1200px</option><option value="1600">1600px</option></select></div>
+      <div class="st"><span class="st-label">Margin</span><select id="margin"><option value="0">None</option><option value="5">Small</option><option value="10" selected>Medium</option><option value="20">Large</option></select></div>
+    </div>
+
+    <label class="upload-zone" id="uploadArea" for="fileInput">
+      <div class="uz-icon">
+        <svg viewBox="0 0 48 48" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="6" y="6" width="36" height="36" rx="5" opacity="0.3"/>
+          <circle cx="17" cy="17" r="3.5" opacity="0.5"/>
+          <path d="M6 33l10-10 7 7 5-5 14 14" opacity="0.4"/>
+          <line x1="24" y1="1" x2="24" y2="12"/><polyline points="19,6 24,1 29,6"/>
+        </svg>
+      </div>
+      <h3><em>Tap to upload</em> or drag &amp; drop</h3>
+      <p class="uz-sub">PNG, JPG, WebP, GIF, BMP &mdash; or press <kbd>Cmd+V</kbd> to paste</p>
+      <div class="uz-btn">Choose Images</div>
+      <input type="file" id="fileInput" multiple accept="image/*">
+    </label>
+
+    <div class="section-head hidden" id="sectionHead">
+      <h2>Images <span class="count" id="imgCount">0</span></h2>
+    </div>
+    <div class="image-grid" id="imageList"></div>
+
+    <div class="action-box hidden" id="actionsBar">
+      <div class="info"><b id="imgCount2">0</b> images ready</div>
+      <button class="btn-gen" id="genBtn">Generate &amp; Download PDF</button>
+      <button class="btn-clear" id="clearBtn">Clear All</button>
+      <div class="prog-text hidden" id="genProgress">Processing...</div>
+    </div>
+  </div>
+
+  <!-- ===== TAB 2: COMPRESS PDF ===== -->
+  <div class="panel" id="panelComp">
+    <div class="settings" id="compSettings">
+      <div class="st"><span class="st-label">Quality</span><input type="range" id="compQuality" min="10" max="100" value="50"><span class="val" id="compQval">50%</span></div>
+      <div class="st"><span class="st-label">Resolution</span><select id="compScale"><option value="1">1x (72 DPI)</option><option value="1.5" selected>1.5x (108 DPI)</option><option value="2">2x (144 DPI)</option></select></div>
+    </div>
+
+    <label class="upload-zone" id="compUpload" for="pdfInput">
+      <div class="uz-icon">
+        <svg viewBox="0 0 48 48" fill="none" stroke="#7c3aed" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="10" y="4" width="28" height="40" rx="4" opacity="0.3"/>
+          <line x1="17" y1="16" x2="31" y2="16" opacity="0.4"/>
+          <line x1="17" y1="22" x2="31" y2="22" opacity="0.4"/>
+          <line x1="17" y1="28" x2="26" y2="28" opacity="0.4"/>
+          <line x1="24" y1="34" x2="24" y2="46"/><polyline points="19,41 24,46 29,41"/>
+        </svg>
+      </div>
+      <h3><em>Upload a PDF</em> to compress</h3>
+      <p class="uz-sub">Nothing leaves your browser &mdash; 100% private</p>
+      <div class="uz-btn">Choose PDF</div>
+      <input type="file" id="pdfInput" accept=".pdf">
+    </label>
+
+    <div class="result-box hidden" id="compResult">
+      <h3 id="compName">file.pdf</h3>
+      <div class="pages" id="compPages"></div>
+      <div class="size-row">
+        <div class="size-card orig"><div class="lbl">Original</div><div class="val" id="origSz">0</div></div>
+        <span class="arrow-sep">&rarr;</span>
+        <div class="size-card comp"><div class="lbl">Compressed</div><div class="val" id="compSz">0</div></div>
+      </div>
+      <div class="saving-badge" id="savingPct"></div>
+      <div>
+        <button class="btn-dl" id="dlCompBtn">Download Compressed PDF</button>
+        <button class="btn-reset" id="resetBtn">Try Another</button>
+      </div>
+    </div>
+
+    <div class="result-box hidden" id="compProgress">
+      <div class="prog-text" id="compProgText">Reading PDF...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => reject(new Error('Failed to load: ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function init() {
+  try {
+    await loadScript('jspdf.min.js');
+  } catch(e) { alert('Failed to load jsPDF library.'); return; }
+  try {
+    await loadScript('pdf.min.js');
+    window['pdfjs-dist/build/pdf'].GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
+  } catch(e) { console.warn('pdf.js unavailable', e); }
+  setupApp();
+}
+
+function setupApp() {
+  const { jsPDF } = window.jspdf;
+
+  // ---- TABS ----
+  const tabImg = document.getElementById('tabImg');
+  const tabComp = document.getElementById('tabComp');
+  const panelImg = document.getElementById('panelImg');
+  const panelComp = document.getElementById('panelComp');
+  tabImg.addEventListener('click', () => { tabImg.classList.add('active'); tabComp.classList.remove('active'); panelImg.classList.add('active'); panelComp.classList.remove('active'); });
+  tabComp.addEventListener('click', () => { tabComp.classList.add('active'); tabImg.classList.remove('active'); panelComp.classList.add('active'); panelImg.classList.remove('active'); });
+
+  // ---- IMAGES TO PDF ----
+  let images = [];
+  const uploadArea = document.getElementById('uploadArea');
+  const fileInput = document.getElementById('fileInput');
+  const imageList = document.getElementById('imageList');
+  const actionsBar = document.getElementById('actionsBar');
+  const sectionHead = document.getElementById('sectionHead');
+  const imgCountEl = document.getElementById('imgCount');
+  const imgCount2 = document.getElementById('imgCount2');
+  const genBtn = document.getElementById('genBtn');
+  const clearBtn = document.getElementById('clearBtn');
+  const genProgress = document.getElementById('genProgress');
+  const qualitySlider = document.getElementById('quality');
+  const qvalSpan = document.getElementById('qval');
+
+  qualitySlider.addEventListener('input', () => { qvalSpan.textContent = qualitySlider.value + '%'; });
+
+  fileInput.addEventListener('change', () => { addFiles(fileInput.files); fileInput.value = ''; });
+
+  uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag'));
+  uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.classList.remove('drag'); addFiles(e.dataTransfer.files); });
+
+  document.addEventListener('paste', e => {
+    if (!panelImg.classList.contains('active')) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) addFiles([f]); }
+    }
+  });
+
+  function addFiles(fileList) {
+    for (const file of fileList) {
+      if (!file.type.startsWith('image/')) continue;
+      const reader = new FileReader();
+      reader.onload = () => { images.push({ dataUrl: reader.result, name: file.name || 'screenshot.png', size: file.size }); render(); };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  function fmtSize(b) { if (b<1024) return b+' B'; if (b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+
+  function render() {
+    imageList.replaceChildren();
+    images.forEach((img, i) => {
+      const card = document.createElement('div');
+      card.className = 'img-card';
+
+      const pic = document.createElement('img');
+      pic.src = img.dataUrl; pic.alt = img.name;
+      card.appendChild(pic);
+
+      const badge = document.createElement('div');
+      badge.className = 'badge'; badge.textContent = i + 1;
+      card.appendChild(badge);
+
+      const xBtn = document.createElement('button');
+      xBtn.className = 'x-btn'; xBtn.textContent = '\u00D7';
+      xBtn.addEventListener('click', () => { images.splice(i, 1); render(); });
+      card.appendChild(xBtn);
+
+      const meta = document.createElement('div');
+      meta.className = 'card-meta';
+      const nm = document.createElement('span'); nm.className = 'nm'; nm.textContent = img.name; nm.title = img.name;
+      const sz = document.createElement('span'); sz.className = 'sz'; sz.textContent = fmtSize(img.size);
+      meta.appendChild(nm); meta.appendChild(sz);
+      card.appendChild(meta);
+
+      imageList.appendChild(card);
+    });
+
+    const has = images.length > 0;
+    sectionHead.classList.toggle('hidden', !has);
+    actionsBar.classList.toggle('hidden', !has);
+    imgCountEl.textContent = images.length;
+    imgCount2.textContent = images.length;
+  }
+
+  clearBtn.addEventListener('click', () => { images = []; render(); });
+
+  genBtn.addEventListener('click', async () => {
+    if (!images.length) return;
+    genBtn.disabled = true;
+    genProgress.classList.remove('hidden');
+    genProgress.textContent = 'Starting...';
+
+    const quality = +qualitySlider.value / 100;
+    const maxW = +document.getElementById('maxW').value;
+    const pageSize = document.getElementById('pageSize').value;
+    const orientSetting = document.getElementById('orient').value;
+    const margin = +document.getElementById('margin').value;
+
+    try {
+      const processed = [];
+      for (let i = 0; i < images.length; i++) {
+        genProgress.textContent = 'Compressing image ' + (i+1) + ' of ' + images.length + '...';
+        await new Promise(r => setTimeout(r, 10));
+        processed.push(await compressImg(images[i].dataUrl, maxW, quality));
+      }
+      genProgress.textContent = 'Building PDF...';
+      await new Promise(r => setTimeout(r, 10));
+
+      const first = processed[0];
+      let pdf;
+      if (pageSize === 'fit') {
+        pdf = new jsPDF({ unit: 'px', format: [first.w, first.h], hotfixes: ['px_scaling'] });
+      } else {
+        const o = orientSetting === 'auto' ? (first.w > first.h ? 'landscape' : 'portrait') : orientSetting;
+        pdf = new jsPDF({ unit: 'mm', format: pageSize, orientation: o });
+      }
+
+      for (let i = 0; i < processed.length; i++) {
+        const { data, w, h } = processed[i];
+        if (i > 0) {
+          if (pageSize === 'fit') pdf.addPage([w, h]);
+          else if (orientSetting === 'auto') pdf.addPage(pageSize, w > h ? 'landscape' : 'portrait');
+          else pdf.addPage();
+        }
+        if (pageSize === 'fit') {
+          pdf.addImage(data, 'JPEG', 0, 0, w, h);
+        } else {
+          const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+          const aw = pw - margin*2, ah = ph - margin*2;
+          const ratio = Math.min(aw/w, ah/h, 1);
+          pdf.addImage(data, 'JPEG', (pw-w*ratio)/2, (ph-h*ratio)/2, w*ratio, h*ratio);
+        }
+      }
+      genProgress.textContent = 'Downloading...';
+      pdf.save('snappdf-' + new Date().toISOString().slice(0,10) + '.pdf');
+      genProgress.textContent = 'Done! PDF downloaded.';
+    } catch(err) {
+      genProgress.textContent = 'Error: ' + err.message;
+      console.error(err);
+    }
+    genBtn.disabled = false;
+    setTimeout(() => genProgress.classList.add('hidden'), 3000);
+  });
+
+  function compressImg(dataUrl, maxW, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (maxW > 0 && w > maxW) { h = Math.round(h*maxW/w); w = maxW; }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve({ data: c.toDataURL('image/jpeg', quality), w, h });
+      };
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  // ---- COMPRESS PDF ----
+  const compUpload = document.getElementById('compUpload');
+  const pdfInput = document.getElementById('pdfInput');
+  const compResult = document.getElementById('compResult');
+  const compProgressEl = document.getElementById('compProgress');
+  const compProgText = document.getElementById('compProgText');
+  const compQualitySlider = document.getElementById('compQuality');
+  const compQvalSpan = document.getElementById('compQval');
+  const compSettings = document.getElementById('compSettings');
+  let compressedBlob = null, compressedName = '';
+
+  compQualitySlider.addEventListener('input', () => { compQvalSpan.textContent = compQualitySlider.value + '%'; });
+
+  pdfInput.addEventListener('change', () => { const f = pdfInput.files[0]; if (f) doCompress(f); pdfInput.value = ''; });
+
+  compUpload.addEventListener('dragover', e => { e.preventDefault(); compUpload.classList.add('drag'); });
+  compUpload.addEventListener('dragleave', () => compUpload.classList.remove('drag'));
+  compUpload.addEventListener('drop', e => { e.preventDefault(); compUpload.classList.remove('drag'); const f = e.dataTransfer.files[0]; if (f) doCompress(f); });
+
+  document.getElementById('dlCompBtn').addEventListener('click', () => {
+    if (!compressedBlob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(compressedBlob);
+    a.download = compressedName;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    compResult.classList.add('hidden');
+    compUpload.classList.remove('hidden');
+    compSettings.classList.remove('hidden');
+    compressedBlob = null;
+  });
+
+  async function doCompress(file) {
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    if (!pdfjsLib) { alert('PDF.js library not available.'); return; }
+    const origSize = file.size;
+    const quality = +compQualitySlider.value / 100;
+    const scale = +document.getElementById('compScale').value;
+
+    compUpload.classList.add('hidden');
+    compSettings.classList.add('hidden');
+    compResult.classList.add('hidden');
+    compProgressEl.classList.remove('hidden');
+    compProgText.textContent = 'Reading PDF...';
+
+    try {
+      const buf = await file.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+      const numPages = pdfDoc.numPages;
+      const pdf = new jsPDF({ unit: 'pt' });
+      let firstPage = true;
+
+      for (let p = 1; p <= numPages; p++) {
+        compProgText.textContent = 'Page ' + p + ' of ' + numPages + '...';
+        await new Promise(r => setTimeout(r, 10));
+        const page = await pdfDoc.getPage(p);
+        const vp = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = vp.width; canvas.height = vp.height;
+        await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+        const imgData = canvas.toDataURL('image/jpeg', quality);
+        const pw = vp.width/scale, ph = vp.height/scale;
+        if (firstPage) { pdf.internal.pageSize.setWidth(pw); pdf.internal.pageSize.setHeight(ph); firstPage = false; }
+        else { pdf.addPage([pw, ph]); }
+        pdf.addImage(imgData, 'JPEG', 0, 0, pw, ph);
+      }
+
+      compProgText.textContent = 'Generating...';
+      await new Promise(r => setTimeout(r, 10));
+      compressedBlob = pdf.output('blob');
+      compressedName = file.name.replace(/\.pdf$/i, '') + '-compressed.pdf';
+
+      compProgressEl.classList.add('hidden');
+      compResult.classList.remove('hidden');
+      document.getElementById('compName').textContent = file.name;
+      document.getElementById('compPages').textContent = numPages + ' page' + (numPages > 1 ? 's' : '');
+      document.getElementById('origSz').textContent = fmtSize(origSize);
+      document.getElementById('compSz').textContent = fmtSize(compressedBlob.size);
+
+      const pct = Math.round((1 - compressedBlob.size / origSize) * 100);
+      const savEl = document.getElementById('savingPct');
+      if (pct > 0) {
+        savEl.textContent = 'Reduced by ' + pct + '%';
+        savEl.style.color = 'var(--green)';
+        savEl.style.background = 'var(--green-glow)';
+      } else {
+        savEl.textContent = 'Increased by ' + Math.abs(pct) + '%';
+        savEl.style.color = 'var(--orange)';
+        savEl.style.background = 'rgba(245,158,11,0.1)';
+      }
+    } catch(err) {
+      compProgressEl.classList.add('hidden');
+      compUpload.classList.remove('hidden');
+      compSettings.classList.remove('hidden');
+      alert('Error: ' + err.message);
+      console.error(err);
+    }
+  }
+}
+init();
+</script>
+</body>
+</html>
