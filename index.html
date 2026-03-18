@@ -596,34 +596,37 @@ function buildPdfCompress(ws, tool) {
 function buildImgToPdf(ws, tool) {
     ws.innerHTML = '';
     const h = document.createElement('h2'); h.className = 'ws-title'; h.textContent = '\ud83d\uddbc\ufe0f Photo to PDF';
-    const d = document.createElement('p'); d.className = 'ws-desc'; d.textContent = 'Step 1: Choose a photo of your document. Step 2: Adjust the corners to select the document area. Step 3: Click "Done" to see the result. Step 4: Download as PDF.';
+    const d = document.createElement('p'); d.className = 'ws-desc'; d.textContent = 'Step 1: Choose a photo. Step 2: Crop it if you want (or skip). Step 3: Download as PDF.';
     ws.append(h, d);
 
-    let imgEl = null, corners = [], displayScale = 1;
-
-    // Step indicators
-    const steps = document.createElement('div'); steps.className = 'scan-steps';
-    const stepData = ['Upload Photo', 'Select Document', 'Preview', 'Download'];
-    const stepEls = [];
-    stepData.forEach((s, i) => {
-        if (i > 0) { const line = document.createElement('div'); line.className = 'scan-step-line'; steps.appendChild(line); }
-        const el = document.createElement('div'); el.className = 'scan-step' + (i === 0 ? ' active' : '');
-        const dot = document.createElement('span'); dot.className = 'step-dot'; dot.textContent = i + 1;
-        const txt = document.createElement('span'); txt.textContent = s;
-        el.append(dot, txt); steps.appendChild(el); stepEls.push(el);
-    });
-    ws.appendChild(steps);
-
-    function setStep(n) { stepEls.forEach((e, i) => { e.className = 'scan-step' + (i < n ? ' done' : (i === n ? ' active' : '')); }); }
+    let imgEl = null, corners = [], displayScale = 1, croppedCanvas = null, dragCorner = -1;
+    const cornerEls = [];
 
     // PHASE 1: Upload
     const uploadWrap = makeUpload(ws, 'image/*', false, (files) => {
         const reader = new FileReader();
-        reader.onload = (e) => { imgEl = new Image(); imgEl.onload = () => showScanner(); imgEl.src = e.target.result; };
+        reader.onload = (e) => { imgEl = new Image(); imgEl.onload = () => showChoice(); imgEl.src = e.target.result; };
         reader.readAsDataURL(files[0]);
     });
 
-    // PHASE 2: Scanner (crop with 4 corners)
+    // PHASE 1b: "Want to crop?" choice
+    const choiceArea = document.createElement('div'); choiceArea.className = 'preview-area'; choiceArea.style.display = 'none';
+    const choiceInner = document.createElement('div'); choiceInner.className = 'preview-img';
+    const choiceImg = document.createElement('img');
+    choiceInner.appendChild(choiceImg);
+    const choiceControls = document.createElement('div'); choiceControls.className = 'preview-controls';
+    const choiceHint = document.createElement('div'); choiceHint.style.cssText = 'font-size:14px;color:var(--tx);margin-bottom:12px;font-weight:600;';
+    choiceHint.textContent = 'Do you want to crop this image before converting?';
+    const choiceBtns = document.createElement('div'); choiceBtns.className = 'btn-group'; choiceBtns.style.marginTop = '0';
+    const yesCropBtn = document.createElement('button'); yesCropBtn.className = 'btn btn-primary'; yesCropBtn.textContent = 'Yes, let me crop';
+    const noCropBtn = document.createElement('button'); noCropBtn.className = 'btn btn-outline'; noCropBtn.textContent = 'No, convert as-is';
+    const choiceNewBtn = document.createElement('button'); choiceNewBtn.className = 'btn btn-outline'; choiceNewBtn.textContent = 'Pick different photo';
+    choiceBtns.append(yesCropBtn, noCropBtn, choiceNewBtn);
+    choiceControls.append(choiceHint, choiceBtns);
+    choiceArea.append(choiceInner, choiceControls);
+    ws.appendChild(choiceArea);
+
+    // PHASE 2: Crop (only if they chose yes)
     const scanArea = document.createElement('div'); scanArea.className = 'preview-area'; scanArea.style.display = 'none';
     const scanInner = document.createElement('div'); scanInner.className = 'preview-img';
     const scanWrap = document.createElement('div'); scanWrap.className = 'scanner-wrap';
@@ -631,58 +634,58 @@ function buildImgToPdf(ws, tool) {
     const overlay = document.createElement('div'); overlay.className = 'scanner-overlay';
     scanWrap.append(scanCanvas, overlay);
     scanInner.appendChild(scanWrap);
-
     const scanControls = document.createElement('div'); scanControls.className = 'preview-controls';
     const scanHint = document.createElement('div'); scanHint.style.cssText = 'font-size:13px;color:var(--tx2);margin-bottom:10px;';
-    scanHint.textContent = 'Drag the orange corners to fit around your document. Then click "Done".';
+    scanHint.textContent = 'Drag the orange corners to select the part you want. Then tap "Done".';
     const scanBtns = document.createElement('div'); scanBtns.className = 'btn-group'; scanBtns.style.marginTop = '0';
-    const autoCropBtn = document.createElement('button'); autoCropBtn.className = 'btn btn-outline'; autoCropBtn.textContent = 'Auto Detect';
-    const doneBtn = document.createElement('button'); doneBtn.className = 'btn btn-primary'; doneBtn.textContent = 'Done \u2192 Preview';
+    const doneBtn = document.createElement('button'); doneBtn.className = 'btn btn-primary'; doneBtn.textContent = 'Done \u2192 Download';
     const resetCropBtn = document.createElement('button'); resetCropBtn.className = 'btn btn-outline'; resetCropBtn.textContent = 'Reset Corners';
-    const newScanBtn = document.createElement('button'); newScanBtn.className = 'btn btn-outline'; newScanBtn.textContent = 'New Photo';
-    scanBtns.append(autoCropBtn, doneBtn, resetCropBtn, newScanBtn);
+    const scanNewBtn = document.createElement('button'); scanNewBtn.className = 'btn btn-outline'; scanNewBtn.textContent = 'New Photo';
+    scanBtns.append(doneBtn, resetCropBtn, scanNewBtn);
     scanControls.append(scanHint, scanBtns);
     scanArea.append(scanInner, scanControls);
     ws.appendChild(scanArea);
 
-    // PHASE 3: Preview + Download
-    const previewArea = document.createElement('div'); previewArea.className = 'preview-area'; previewArea.style.display = 'none';
-    const previewInner = document.createElement('div'); previewInner.className = 'preview-doc';
-    const previewImg = document.createElement('img');
-    previewInner.appendChild(previewImg);
-    const previewControls = document.createElement('div'); previewControls.className = 'preview-controls';
-    const prevBtns = document.createElement('div'); prevBtns.className = 'btn-group'; prevBtns.style.marginTop = '0';
-    const dlPdfBtn = document.createElement('button'); dlPdfBtn.className = 'btn btn-primary'; dlPdfBtn.textContent = 'Download as PDF';
-    const dlImgBtn = document.createElement('button'); dlImgBtn.className = 'btn btn-outline'; dlImgBtn.textContent = 'Download as Image';
-    const backToScanBtn = document.createElement('button'); backToScanBtn.className = 'btn btn-outline'; backToScanBtn.textContent = '\u2190 Adjust Crop';
-    const anotherBtn = document.createElement('button'); anotherBtn.className = 'btn btn-outline'; anotherBtn.textContent = 'New Photo';
-    prevBtns.append(dlPdfBtn, dlImgBtn, backToScanBtn, anotherBtn);
-    previewControls.appendChild(prevBtns);
-    previewArea.append(previewInner, previewControls);
-    ws.appendChild(previewArea);
+    // PHASE 3: Download
+    const dlArea = document.createElement('div'); dlArea.style.display = 'none';
+    ws.appendChild(dlArea);
 
-    let croppedCanvas = null;
+    function hideAll() { choiceArea.style.display = 'none'; scanArea.style.display = 'none'; dlArea.style.display = 'none'; uploadWrap.style.display = 'none'; }
 
-    // Corner dragging
-    let dragCorner = -1;
-    const cornerEls = [];
+    function showChoice() {
+        hideAll(); choiceArea.style.display = '';
+        choiceImg.src = imgEl.src;
+        choiceImg.style.maxHeight = '350px';
+    }
 
-    function showScanner() {
-        uploadWrap.style.display = 'none'; scanArea.style.display = ''; previewArea.style.display = 'none';
-        setStep(1);
+    choiceNewBtn.addEventListener('click', () => { hideAll(); uploadWrap.style.display = ''; });
+
+    // NO CROP — go straight to download
+    noCropBtn.addEventListener('click', async () => {
+        noCropBtn.disabled = true; noCropBtn.textContent = 'Creating PDF...';
+        const c = document.createElement('canvas'); c.width = imgEl.width; c.height = imgEl.height;
+        c.getContext('2d').drawImage(imgEl, 0, 0);
+        await downloadAsPdf(c);
+        noCropBtn.disabled = false; noCropBtn.textContent = 'No, convert as-is';
+    });
+
+    // YES CROP — show crop UI
+    yesCropBtn.addEventListener('click', () => showCropper());
+
+    function showCropper() {
+        hideAll(); scanArea.style.display = '';
         const maxW = 650;
         displayScale = Math.min(maxW / imgEl.width, 1);
         scanCanvas.width = imgEl.width; scanCanvas.height = imgEl.height;
         scanCanvas.style.width = (imgEl.width * displayScale) + 'px';
         scanCanvas.style.height = (imgEl.height * displayScale) + 'px';
         scanCanvas.getContext('2d').drawImage(imgEl, 0, 0);
-        // Default corners: 8% inset
-        const m = 0.08;
+        const m = 0.05;
         corners = [
-            { x: m * imgEl.width, y: m * imgEl.height },               // top-left
-            { x: (1 - m) * imgEl.width, y: m * imgEl.height },         // top-right
-            { x: (1 - m) * imgEl.width, y: (1 - m) * imgEl.height },   // bottom-right
-            { x: m * imgEl.width, y: (1 - m) * imgEl.height },         // bottom-left
+            { x: m * imgEl.width, y: m * imgEl.height },
+            { x: (1 - m) * imgEl.width, y: m * imgEl.height },
+            { x: (1 - m) * imgEl.width, y: (1 - m) * imgEl.height },
+            { x: m * imgEl.width, y: (1 - m) * imgEl.height },
         ];
         renderOverlay();
     }
@@ -690,12 +693,10 @@ function buildImgToPdf(ws, tool) {
     function renderOverlay() {
         while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
         cornerEls.length = 0;
-        // SVG polygon
         const svgNS = 'http://www.w3.org/2000/svg';
         const svg = document.createElementNS(svgNS, 'svg');
         svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
         svg.setAttribute('viewBox', '0 0 ' + imgEl.width + ' ' + imgEl.height);
-        // Mask: darken outside
         const defs = document.createElementNS(svgNS, 'defs');
         const mask = document.createElementNS(svgNS, 'mask'); mask.id = 'scanMask';
         const maskBg = document.createElementNS(svgNS, 'rect');
@@ -703,26 +704,21 @@ function buildImgToPdf(ws, tool) {
         const maskPoly = document.createElementNS(svgNS, 'polygon');
         maskPoly.setAttribute('points', corners.map(c => c.x + ',' + c.y).join(' ')); maskPoly.setAttribute('fill', 'black');
         mask.append(maskBg, maskPoly); defs.appendChild(mask); svg.appendChild(defs);
-        // Dark overlay outside selection
         const darkRect = document.createElementNS(svgNS, 'rect');
         darkRect.setAttribute('x', '0'); darkRect.setAttribute('y', '0'); darkRect.setAttribute('width', imgEl.width); darkRect.setAttribute('height', imgEl.height);
         darkRect.setAttribute('fill', 'rgba(0,0,0,0.5)'); darkRect.setAttribute('mask', 'url(#scanMask)');
         svg.appendChild(darkRect);
-        // Selection border
         const poly = document.createElementNS(svgNS, 'polygon');
         poly.setAttribute('points', corners.map(c => c.x + ',' + c.y).join(' '));
         poly.setAttribute('fill', 'none'); poly.setAttribute('stroke', '#f97316'); poly.setAttribute('stroke-width', '3');
         svg.appendChild(poly);
         overlay.appendChild(svg);
-
-        // Corner handles (HTML divs for easier dragging)
         corners.forEach((c, i) => {
             const handle = document.createElement('div'); handle.className = 'corner-handle';
             handle.style.left = (c.x * displayScale) + 'px';
             handle.style.top = (c.y * displayScale) + 'px';
             handle.addEventListener('mousedown', (e) => { e.preventDefault(); dragCorner = i; });
-            overlay.appendChild(handle);
-            cornerEls.push(handle);
+            overlay.appendChild(handle); cornerEls.push(handle);
         });
     }
 
@@ -732,133 +728,67 @@ function buildImgToPdf(ws, tool) {
         const x = Math.max(0, Math.min(imgEl.width, (e.clientX - r.left) / displayScale));
         const y = Math.max(0, Math.min(imgEl.height, (e.clientY - r.top) / displayScale));
         corners[dragCorner] = { x, y };
-        // Update handle position
         cornerEls[dragCorner].style.left = (x * displayScale) + 'px';
         cornerEls[dragCorner].style.top = (y * displayScale) + 'px';
-        // Update SVG
         const polys = overlay.querySelectorAll('polygon');
         polys.forEach(p => p.setAttribute('points', corners.map(c => c.x + ',' + c.y).join(' ')));
     });
     document.addEventListener('mouseup', () => { dragCorner = -1; });
 
-    // Auto detect: find high-contrast edges (simple: find the document rectangle)
-    autoCropBtn.addEventListener('click', () => {
-        // Simple auto-detect: analyze brightness to find document area
-        const c = document.createElement('canvas'); c.width = imgEl.width; c.height = imgEl.height;
-        const cx = c.getContext('2d'); cx.drawImage(imgEl, 0, 0);
-        const data = cx.getImageData(0, 0, c.width, c.height).data;
-        const w = c.width, ht = c.height;
-
-        // Scan from each edge inward to find where brightness changes significantly
-        function avgBrightness(px, py, sw, sh) {
-            let sum = 0, count = 0;
-            for (let y = py; y < py + sh && y < ht; y += 2) {
-                for (let x = px; x < px + sw && x < w; x += 2) {
-                    const idx = (y * w + x) * 4;
-                    sum += (data[idx] + data[idx+1] + data[idx+2]) / 3;
-                    count++;
-                }
-            }
-            return count > 0 ? sum / count : 128;
-        }
-        // Find document edges by looking for brightness jump
-        const step = Math.max(1, Math.floor(Math.min(w, ht) / 50));
-        let left = 0, right = w, top = 0, bottom = ht;
-        const bgBright = avgBrightness(0, 0, step * 3, step * 3);
-        const threshold = 30;
-
-        // Find left edge
-        for (let x = 0; x < w * 0.4; x += step) {
-            const b = avgBrightness(x, ht * 0.3, step, ht * 0.4);
-            if (Math.abs(b - bgBright) > threshold) { left = Math.max(0, x - step); break; }
-        }
-        // Find right edge
-        for (let x = w - 1; x > w * 0.6; x -= step) {
-            const b = avgBrightness(x - step, ht * 0.3, step, ht * 0.4);
-            if (Math.abs(b - bgBright) > threshold) { right = Math.min(w, x + step); break; }
-        }
-        // Find top edge
-        for (let y = 0; y < ht * 0.4; y += step) {
-            const b = avgBrightness(w * 0.3, y, w * 0.4, step);
-            if (Math.abs(b - bgBright) > threshold) { top = Math.max(0, y - step); break; }
-        }
-        // Find bottom edge
-        for (let y = ht - 1; y > ht * 0.6; y -= step) {
-            const b = avgBrightness(w * 0.3, y - step, w * 0.4, step);
-            if (Math.abs(b - bgBright) > threshold) { bottom = Math.min(ht, y + step); break; }
-        }
-
-        corners = [
-            { x: left, y: top },
-            { x: right, y: top },
-            { x: right, y: bottom },
-            { x: left, y: bottom },
-        ];
-        renderOverlay();
-    });
-
     resetCropBtn.addEventListener('click', () => {
-        const m = 0.08;
-        corners = [
-            { x: m * imgEl.width, y: m * imgEl.height },
-            { x: (1 - m) * imgEl.width, y: m * imgEl.height },
-            { x: (1 - m) * imgEl.width, y: (1 - m) * imgEl.height },
-            { x: m * imgEl.width, y: (1 - m) * imgEl.height },
-        ];
+        const m = 0.05;
+        corners = [{ x: m*imgEl.width, y: m*imgEl.height },{ x: (1-m)*imgEl.width, y: m*imgEl.height },{ x: (1-m)*imgEl.width, y: (1-m)*imgEl.height },{ x: m*imgEl.width, y: (1-m)*imgEl.height }];
         renderOverlay();
     });
+    scanNewBtn.addEventListener('click', () => { hideAll(); uploadWrap.style.display = ''; });
 
-    newScanBtn.addEventListener('click', () => { scanArea.style.display = 'none'; previewArea.style.display = 'none'; uploadWrap.style.display = ''; setStep(0); });
-
-    // Done: crop to selection and show preview
-    doneBtn.addEventListener('click', () => {
-        // Get bounding box of corners
+    // DONE — crop and download
+    doneBtn.addEventListener('click', async () => {
         const xs = corners.map(c => c.x), ys = corners.map(c => c.y);
         const minX = Math.max(0, Math.min(...xs)), maxX = Math.min(imgEl.width, Math.max(...xs));
         const minY = Math.max(0, Math.min(...ys)), maxY = Math.min(imgEl.height, Math.max(...ys));
         const cw = Math.round(maxX - minX), ch = Math.round(maxY - minY);
         if (cw < 10 || ch < 10) return;
-
-        croppedCanvas = document.createElement('canvas'); croppedCanvas.width = cw; croppedCanvas.height = ch;
-        const cx = croppedCanvas.getContext('2d');
-        // Apply slight enhancement for doc: boost contrast + brightness
-        cx.filter = 'contrast(1.1) brightness(1.05)';
+        const c = document.createElement('canvas'); c.width = cw; c.height = ch;
+        const cx = c.getContext('2d');
+        cx.filter = 'contrast(1.05) brightness(1.03)';
         cx.drawImage(imgEl, -Math.round(minX), -Math.round(minY));
         cx.filter = 'none';
-
-        previewImg.src = croppedCanvas.toDataURL('image/png');
-        scanArea.style.display = 'none'; previewArea.style.display = '';
-        setStep(2);
+        doneBtn.disabled = true; doneBtn.textContent = 'Creating PDF...';
+        await downloadAsPdf(c);
+        doneBtn.disabled = false; doneBtn.textContent = 'Done \u2192 Download';
     });
 
-    backToScanBtn.addEventListener('click', () => { previewArea.style.display = 'none'; scanArea.style.display = ''; setStep(1); });
-    anotherBtn.addEventListener('click', () => { previewArea.style.display = 'none'; scanArea.style.display = 'none'; uploadWrap.style.display = ''; setStep(0); });
-
-    // Download as PDF
-    dlPdfBtn.addEventListener('click', async () => {
-        if (!croppedCanvas) return;
-        dlPdfBtn.disabled = true; dlPdfBtn.textContent = 'Creating PDF...';
+    async function downloadAsPdf(canvas) {
         try {
-            const pngBlob = await new Promise(r => croppedCanvas.toBlob(r, 'image/png'));
+            const pngBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
             const pngBytes = await pngBlob.arrayBuffer();
             const pdf = await PDFDocument.create();
             const pngImg = await pdf.embedPng(pngBytes);
             const page = pdf.addPage([pngImg.width, pngImg.height]);
             page.drawImage(pngImg, { x: 0, y: 0, width: pngImg.width, height: pngImg.height });
             const pdfBytes = await pdf.save();
-            const a = document.createElement('a'); a.download = 'document.pdf';
-            a.href = URL.createObjectURL(new Blob([pdfBytes], { type: 'application/pdf' })); a.click();
-            setStep(3);
-        } catch (err) { alert('Error: ' + err.message); }
-        dlPdfBtn.disabled = false; dlPdfBtn.textContent = 'Download as PDF';
-    });
 
-    // Download as image
-    dlImgBtn.addEventListener('click', () => {
-        if (!croppedCanvas) return;
-        const a = document.createElement('a'); a.download = 'document.png'; a.href = croppedCanvas.toDataURL('image/png'); a.click();
-        setStep(3);
-    });
+            // Show result
+            hideAll(); dlArea.style.display = '';
+            while (dlArea.firstChild) dlArea.removeChild(dlArea.firstChild);
+            const box = document.createElement('div'); box.className = 'result-box';
+            const ri = document.createElement('div'); ri.className = 'r-icon'; ri.textContent = '\u2705';
+            const rt = document.createElement('div'); rt.className = 'r-title'; rt.textContent = 'PDF Ready!';
+            const rm = document.createElement('div'); rm.className = 'r-meta'; rm.textContent = canvas.width + ' \u00d7 ' + canvas.height + 'px \u00b7 ' + fmtSize(pdfBytes.length);
+            const dlBtn = document.createElement('button'); dlBtn.className = 'btn btn-primary'; dlBtn.style.marginRight = '8px';
+            dlBtn.textContent = 'Download PDF';
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            dlBtn.addEventListener('click', () => { const a = document.createElement('a'); a.download = 'document.pdf'; a.href = URL.createObjectURL(blob); a.click(); });
+            const dlImgBtn2 = document.createElement('button'); dlImgBtn2.className = 'btn btn-outline'; dlImgBtn2.style.marginRight = '8px';
+            dlImgBtn2.textContent = 'Download as Image';
+            dlImgBtn2.addEventListener('click', () => { const a = document.createElement('a'); a.download = 'document.png'; a.href = canvas.toDataURL('image/png'); a.click(); });
+            const newBtn = document.createElement('button'); newBtn.className = 'btn btn-outline'; newBtn.textContent = 'Convert Another';
+            newBtn.addEventListener('click', () => { hideAll(); uploadWrap.style.display = ''; });
+            box.append(ri, rt, rm, dlBtn, dlImgBtn2, newBtn);
+            dlArea.appendChild(box);
+        } catch (err) { alert('Error: ' + err.message); }
+    }
 }
 
 // ============================================================
